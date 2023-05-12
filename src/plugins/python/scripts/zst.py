@@ -135,7 +135,7 @@ def deplane2bpp(src, dst):
 
 def deplane4bpp(src):
   "decode planar 4bpp line of 8px into packed color indexes"
-  dst = deplane2bpp(src[1], list())
+  dst = deplane2bpp(src[1], [])
   for i in range(len(dst)):
     for j in range(len(dst[i])):
       dst[i][j] <<= 2

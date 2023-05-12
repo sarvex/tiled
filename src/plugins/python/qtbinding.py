@@ -57,9 +57,11 @@ class QFlagsOptionParam(Parameter):
 
   def convert_python_to_c(self, wrapper):
     name = wrapper.declarations.declare_variable("QFileDialog::Option", self.name)
-    wrapper.parse_params.add_parameter('i', ['&'+name], self.value, optional=bool(self.default_value))
+    wrapper.parse_params.add_parameter('i', [f'&{name}'],
+                                       self.value,
+                                       optional=bool(self.default_value))
     if self.default_value is None:
-      wrapper.call_params.append('(QFlags<QFileDialog::Option>)%s' % name)
+      wrapper.call_params.append(f'(QFlags<QFileDialog::Option>){name}')
     else:
       wrapper.call_params.append(self.default_value)
 
@@ -73,12 +75,15 @@ class QStringPtrParam(PointerParameter):
   def convert_python_to_c(self, wrapper):
     name = wrapper.declarations.declare_variable("const char *", self.name)
     if self.default_value is None:
-      name_qst = wrapper.declarations.declare_variable("QString*", self.name + '_qst',
-        'new QString(%s)' % name)
-      wrapper.call_params.append('%s' % name_qst)
+      name_qst = wrapper.declarations.declare_variable("QString*",
+                                                       f'{self.name}_qst',
+                                                       f'new QString({name})')
+      wrapper.call_params.append(f'{name_qst}')
     else:
       wrapper.call_params.append(self.default_value)
-    wrapper.parse_params.add_parameter('s', ['&'+name], self.value, optional=bool(self.default_value))
+    wrapper.parse_params.add_parameter('s', [f'&{name}'],
+                                       self.value,
+                                       optional=bool(self.default_value))
 
 class QStringParam(Parameter):
   DIRECTIONS = [Parameter.DIRECTION_IN]
@@ -88,13 +93,14 @@ class QStringParam(Parameter):
     return "return QString();"
 
   def convert_c_to_python(self, wrapper):
-    wrapper.build_params.add_parameter("s", ['%s.toUtf8().data()' % self.value], prepend=True)
+    wrapper.build_params.add_parameter("s", [f'{self.value}.toUtf8().data()'],
+                                       prepend=True)
 
   def convert_python_to_c(self, wrapper):
     name = wrapper.declarations.declare_variable("const char *", self.name)
-    len_ = wrapper.declarations.declare_variable("Py_ssize_t", self.name+"_len")
-    wrapper.parse_params.add_parameter('s#', ['&'+name, '&'+len_], self.value)
-    wrapper.call_params.append('QString::fromUtf8(%s)' % name)
+    len_ = wrapper.declarations.declare_variable("Py_ssize_t", f"{self.name}_len")
+    wrapper.parse_params.add_parameter('s#', [f'&{name}', f'&{len_}'], self.value)
+    wrapper.call_params.append(f'QString::fromUtf8({name})')
 
 class QStringReturnValue(ReturnValue):
   CTYPES = ['QString']
@@ -106,11 +112,12 @@ class QStringReturnValue(ReturnValue):
     #raise NotImplementedError # TODO (needed only for virtual methods where C calls Python code)
     ptr = wrapper.declarations.declare_variable("const char *", "retval_ptr")
     len_ = wrapper.declarations.declare_variable("Py_ssize_t", "retval_len")
-    wrapper.parse_params.add_parameter("s#", ['&'+ptr, '&'+len_])
-    wrapper.after_call.write_code("%s = QString(%s);" % (self.value, ptr))
+    wrapper.parse_params.add_parameter("s#", [f'&{ptr}', f'&{len_}'])
+    wrapper.after_call.write_code(f"{self.value} = QString({ptr});")
 
   def convert_c_to_python(self, wrapper):
-    wrapper.build_params.add_parameter("s", ['%s.toUtf8().data()' % self.value], prepend=True)
+    wrapper.build_params.add_parameter("s", [f'{self.value}.toUtf8().data()'],
+                                       prepend=True)
 
 def generate(parent_mod):
   mod = module.SubModule('qt', parent_mod)

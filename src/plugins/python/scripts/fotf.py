@@ -40,7 +40,7 @@ class Fury(T.Plugin):
     decnum = (int(re.findall('[0-9]+', f).pop())-1)/10
     if decnum >= len(decs): decnum %= len(decs)
     gfxf = 'DEC/DECOR%02i.LBM' % decs[int(decnum)]
-    gfxf = utils.find_sensitive_path(dirname(f)+'/../', gfxf)
+    gfxf = utils.find_sensitive_path(f'{dirname(f)}/../', gfxf)
     t = T.Tiled.Tileset.create('DECOR', 16,16, 0, 0)
     t.data().loadFromImage(fr.readtilegfx(gfxf), '')
     l = T.Tiled.TileLayer('Tiles',0,0, fr.w, fr.h)
@@ -75,9 +75,7 @@ class Fury(T.Plugin):
           continue
 
         for x in range(l.width()):
-          for y in range(l.height()):
-            tiles.append( l.cellAt(x, y).tile.id() )
-
+          tiles.extend(l.cellAt(x, y).tile.id() for y in range(l.height()))
         print(tiles, file=fh)
 
     return False
@@ -88,11 +86,11 @@ class Fury(T.Plugin):
       fh.read(4)  #skip sig
       ldata = LevelData()
       rdata = RleData()
-      while ldata.unpack(fh) and ldata.len != 0 :
+      while ldata.unpack(fh) and ldata.len != 0:
         if len(ldata.d)==1 and ldata.d[0] == 0: break
         rdata.unpack(fh)
         dat.extend(ldata.d)
-        dat.extend([rdata.val for i in range(rdata.rep)])
+        dat.extend([rdata.val for _ in range(rdata.rep)])
 
     print('le',len(dat))
     self.w, self.h = unpack("<2H", dat[:4])

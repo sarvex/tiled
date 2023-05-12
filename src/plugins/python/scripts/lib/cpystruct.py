@@ -15,6 +15,7 @@
   You should have received a copy of the GNU General Public License
   along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
+
 import re, sys, struct
 
 # struct.pack format characters prefixed by :
@@ -44,7 +45,7 @@ FORMATS = {
 }
 fdict = {}
 for f in FORMATS:
-  fdict.update( [(p,f) for p in FORMATS[f].split('|')] )
+  fdict |= [(p,f) for p in FORMATS[f].split('|')]
 
 class CpySkeleton(struct.Struct):
   """ Not to be used directly, use CpyStruct() to build a class """
@@ -55,7 +56,7 @@ class CpySkeleton(struct.Struct):
 
     self.validate()
 
-    if len(kws) > 0:
+    if kws:
       for k in kws:
         setattr(self, k, kws[k])
 
@@ -69,8 +70,7 @@ class CpySkeleton(struct.Struct):
       if a != '' and not a.isdigit() and i < len(self.formats):
         for b in self.formats[i:]:
           if a=='' or b[2].isdigit():
-            raise Exception('Varlength arrays only '+
-              'supported at end of struct: %s[%s]' % (n,a))
+            raise Exception(f'Varlength arrays only supported at end of struct: {n}[{a}]')
 
   def pack(self):
     "convert member values to binary"
@@ -90,7 +90,7 @@ class CpySkeleton(struct.Struct):
         a = int(a) if a.isdigit() else getattr(self, a)
         if f=='c':
           # chararray as string
-          f = str(a)+'s'
+          f = f'{str(a)}s'
           a = 0
 
       if type(f) == type(struct.Struct):
@@ -98,7 +98,7 @@ class CpySkeleton(struct.Struct):
         # temp hack because of qmap<str,str> limitations in tiled map props
         sz = struct.calcsize(fstr)
         m = re.match('<[0-9]*[sc]',fstr)
-        if a != '' and a > 0 and (m is None or m.group(0) != fstr):
+        if a != '' and a > 0 and (m is None or m[0] != fstr):
           for j in range(len(v)): #a):
             v2 = f(v[j].ljust(sz,'\0'))
             ret += v2.pack()
@@ -165,7 +165,7 @@ class CpySkeleton(struct.Struct):
         sz = struct.calcsize(getattr(f, '__fstr'))
         if arlen > 0:
           arr = []
-          for i in range(arlen):
+          for _ in range(arlen):
             arr.append( f(buf[rawpos:rawpos+sz]) )
             rawpos += sz
             pos += len(f.formats)
@@ -202,13 +202,13 @@ class CpySkeleton(struct.Struct):
           # custom types
           sz = struct.calcsize(getattr(f, '__fstr'))
           arr = []
-          for i in range(c):
+          for _ in range(c):
             arr.append( f(dat.read(sz)) )
             rawpos += sz
           setattr(self, n, arr)
         else:
           # primitives
-          f = str(c)+'s' if fdict[f]=='c' else str(c)+fdict[f]
+          f = f'{str(c)}s' if fdict[f]=='c' else str(c)+fdict[f]
           sz = struct.calcsize(f)
           val = struct.unpack(f, dat.read(sz))
           #if len(val) == 1: val = val[0]
@@ -221,10 +221,10 @@ class CpySkeleton(struct.Struct):
     return struct.calcsize(getattr(self, '__fstr'))
 
   def __str__(self):
-    ret = self.__class__.__name__+'['
+    ret = f'{self.__class__.__name__}['
     for f,n,a,v in self.formats:
-      ret += '%s=%s,' % (n,getattr(self, n, ''))
-    return ret[:-1]+']'
+      ret += f"{n}={getattr(self, n, '')},"
+    return f'{ret[:-1]}]'
 
 
 def peek(s, n):
@@ -237,20 +237,17 @@ def parseformat(fmt, callscope=None):
   fstr = ''
   sz = []
   for i,(f,n,a,v) in enumerate(fmt):
-    if f == ',' and i > 0:
+    if f == ',':
+      if i <= 0:
+        raise Exception(f'Unexpected comma at {str(fmt[i])}')
+
       fmt[i] = (fmt[i-1][0],n,a,v)
       f = fmt[i-1][0]
-    elif f == ',':
-      raise Exception('Unexpected comma at '+str(fmt[i]))
-
     fs = ''
     if f in fdict:
       if a.isdigit():
         fs = 's' if fdict[f] == 'c' else fdict[f]
-      elif a != '' and not a.isdigit():
-        # varlength array, read separately
-        pass
-      else:
+      elif a == '' or a.isdigit():
         # C type
         fs = fdict[f]
     elif type(f) is type(CpySkeleton):
@@ -265,7 +262,7 @@ def parseformat(fmt, callscope=None):
       fs = f[1:]
       fmt[i] = (f[1:],n,a,v)
     else:
-      raise Exception('Unknown format at '+str(fmt[i]))
+      raise Exception(f'Unknown format at {str(fmt[i])}')
 
     if a.isdigit():
       # in case it's e.g. custom type of a string
@@ -299,13 +296,13 @@ def CpyStruct(s, endianflg='<'):
   elif endianflg == False:
     endianflg = '<'
 
-  d = {}
-  d['__endianflag'] = endianflg
-  d['__fstr'] = endianflg + fstr
-  d['__fsz'] = fsz
-  d['__slots__'] = [n for f,n,a,v in fmt]
-  d['formats'] = fmt
-
+  d = {
+      '__endianflag': endianflg,
+      '__fstr': endianflg + fstr,
+      '__fsz': fsz,
+      '__slots__': [n for f, n, a, v in fmt],
+      'formats': fmt,
+  }
   for f,n,a,v in fmt:
     if v != '': d[n] = int(v,0)
 

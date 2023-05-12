@@ -41,7 +41,7 @@ class PK2(T.Plugin):
 
     # -- tileset
     img = T.qt.QImage()
-    imgfile = dirname(f)+'/../../gfx/tiles/'+str(lvl.tileFile)
+    imgfile = f'{dirname(f)}/../../gfx/tiles/{str(lvl.tileFile)}'
     img.load(imgfile, 'BMP')
     t = T.Tiled.Tileset.create('Tiles', 32,32, 0, 0)
     t.data().setTransparentColor(T.qt.QColor(img.color(255)))
@@ -64,7 +64,7 @@ class PK2(T.Plugin):
     # -- background image
     lai = T.Tiled.ImageLayer('Scenery', bb[2], bb[3])
     img = T.qt.QImage()
-    imgfile = dirname(f)+'/../../gfx/scenery/'+str(lvl.fieldFile)
+    imgfile = f'{dirname(f)}/../../gfx/scenery/{str(lvl.fieldFile)}'
     img.load(imgfile, 'BMP')
     lai.loadFromImage(img, imgfile)
 
@@ -75,7 +75,7 @@ class PK2(T.Plugin):
     la2 = T.Tiled.TileLayer('Front', 0,0, bb[2], bb[3])
     lay2.doTiles(t, la2, bb)
 
-    sprdir = dirname(f)+'/../../sprites/'
+    sprdir = f'{dirname(f)}/../../sprites/'
     lay3.sprites = [0]
     lay3.spriteGfx = {}
 
@@ -140,9 +140,9 @@ class PK2(T.Plugin):
           continue
 
         for y in range(l.height()):
-          for x in range(l.width()):
-            if l.cellAt(x, y).tile != None:
-              tiles.append( l.cellAt(x, y).tile.id() )
+          tiles.extend(
+              l.cellAt(x, y).tile.id() for x in range(l.width())
+              if l.cellAt(x, y).tile != None)
         print(0,0, l.width(), l.height(), file=fh)
         print(bytearray(tiles), file=fh)
 
@@ -156,7 +156,7 @@ def find_case_insensitive_filename(path, fn):
 class asciilongfile(cpystruct.CpyStruct("char filename[100]")):
   @classmethod
   def fromraw(cls, v):
-    return re.search('[\w\.]*', v, re.U).group(0)
+    return re.search('[\w\.]*', v, re.U)[0]
   def __repr__(self):
     return str(self)
   def __str__(self):
@@ -165,7 +165,7 @@ class asciilongfile(cpystruct.CpyStruct("char filename[100]")):
 class asciifile(cpystruct.CpyStruct("char filename[13]")):
   @classmethod
   def fromraw(cls, v):
-    return re.search('[\w\.]*', v, re.U).group(0)
+    return re.search('[\w\.]*', v, re.U)[0]
   def __repr__(self):
     return str(self)
   def __str__(self):
@@ -174,7 +174,7 @@ class asciifile(cpystruct.CpyStruct("char filename[13]")):
 class asciitxt(cpystruct.CpyStruct("char txt[40]")):
   @classmethod
   def fromraw(cls, v):
-    return re.search('[\w\. ]', v, re.U).group(0)
+    return re.search('[\w\. ]', v, re.U)[0]
 
 class asciinum(cpystruct.CpyStruct("char num[8]")):
   @classmethod

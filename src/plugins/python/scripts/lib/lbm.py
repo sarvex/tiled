@@ -68,20 +68,18 @@ def uncomp(dat):
     v = struct.unpack('b', dat[i:i+1])[0]
     i += 1
     if v >= 0:
-      for n in range(v+1):
+      for _ in range(v+1):
         ret += dat[i:i+1]
         i += 1
     elif v != -128:
-      for n in range(v-1,0,1):
+      for _ in range(v-1,0,1):
         ret += dat[i:i+1]
       i += 1
   return ret
 
 def readbody(bd, ch):
   bj = [0,int((ch.sz.w+15) / 16) * 2]
-  for p in range(2,ch.planes):
-    bj.append(bj[1] * p)
-
+  bj.extend(bj[1] * p for p in range(2,ch.planes))
   sj = bj[1] * ch.planes
   for sl in range(0, sj*ch.sz.h, sj):
     for x in range(ch.sz.w):
@@ -99,18 +97,15 @@ def parselbm(f):
     if id == 'BMHD':
       ch = BMHD(dat)
       yield id, ch
+    elif id == 'BODY':
+      bd = uncomp(dat) if ch.comp == 1 else dat
+      yield id, bd
+    elif id == 'CAMG':
+      raise Exception('HAM/HALFBRITE not supported at the moment')
     elif id == 'CMAP':
       yield id, list(CMAP.parse(dat))
     elif id == 'CRNG':
       yield id, CRNG(dat)
-    elif id == 'CAMG':
-      raise Exception('HAM/HALFBRITE not supported at the moment')
-    elif id == 'BODY':
-      if ch.comp == 1:
-        bd = uncomp(dat)
-      else:
-        bd = dat
-      yield id, bd
 
 if __name__ == "__main__":
   import sys

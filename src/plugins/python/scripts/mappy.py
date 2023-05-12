@@ -80,37 +80,37 @@ class Mappy(T.Plugin, FMPPicklerMixin):
   @classmethod
   def read(cls, f):
 
-    print('Loading map at',f)
-    chunks = cls.unpackchunks(f)
-    hd = MPHD()
-    # perhaps cpystruct should only read as many bytes as it can handle?
-    hd.unpack(chunks['MPHD'].data[:len(hd)])
+      print('Loading map at',f)
+      chunks = cls.unpackchunks(f)
+      hd = MPHD()
+      # perhaps cpystruct should only read as many bytes as it can handle?
+      hd.unpack(chunks['MPHD'].data[:len(hd)])
 
-    m = T.Tiled.Map(T.Tiled.Map.Orthogonal, hd.mapwidth, hd.mapheight,
-                    hd.blockwidth, hd.blockheight)
-    if hd.type == 2:
-      print('Isometric maps not supported at the moment')
+      m = T.Tiled.Map(T.Tiled.Map.Orthogonal, hd.mapwidth, hd.mapheight,
+                      hd.blockwidth, hd.blockheight)
+      if hd.type == 2:
+        print('Isometric maps not supported at the moment')
+        return m
+
+      #TODO: m.setProperty('chunks', cls.picklechunks(chunks))
+
+      tset = T.Tiled.Tileset.create('Tiles', hd.blockwidth, hd.blockheight, 0, 0)
+      cmap = list(FMPColormap.unpack(chunks['CMAP'].data))
+      tset.data().loadFromImage(FMPTileGfx.unpack(hd, chunks['BGFX'].data, cmap), "")
+
+      blks = FMPBlocks(chunks['BKDT'].data, hd).blocks
+
+      for c in [f'LYR{str(i)}' for i in range(7,0,-1)] + ['BODY']:
+          if c not in chunks: continue
+          print('populating',c)
+          lay = T.Tiled.TileLayer(c,0,0,hd.mapwidth, hd.mapheight)
+          lvl = list(FMPLayer.unpack(hd, chunks[c].data))
+          FMPLayer.populate(lay, blks, tset.data(), hd, lvl)
+          m.addLayer(lay)
+
+      m.addTileset(tset)
+
       return m
-
-    #TODO: m.setProperty('chunks', cls.picklechunks(chunks))
-
-    tset = T.Tiled.Tileset.create('Tiles', hd.blockwidth, hd.blockheight, 0, 0)
-    cmap = list(FMPColormap.unpack(chunks['CMAP'].data))
-    tset.data().loadFromImage(FMPTileGfx.unpack(hd, chunks['BGFX'].data, cmap), "")
-
-    blks = FMPBlocks(chunks['BKDT'].data, hd).blocks
-
-    for c in ['LYR'+str(i) for i in range(7,0,-1)]+['BODY']:
-      if c not in chunks: continue
-      print('populating',c)
-      lay = T.Tiled.TileLayer(c,0,0,hd.mapwidth, hd.mapheight)
-      lvl = list(FMPLayer.unpack(hd, chunks[c].data))
-      FMPLayer.populate(lay, blks, tset.data(), hd, lvl)
-      m.addLayer(lay)
-
-    m.addTileset(tset)
-
-    return m
 
 
   @classmethod
@@ -214,40 +214,38 @@ class FMPLayer:
   @classmethod
   def populate(cls, layer, blocks, tileset, hd, ldata):
 
-    for fg in range(4):
-      i = 0
+      for fg in range(4):
+          i = 0
 
-      for y in range(hd.mapheight):
-        for x in range(hd.mapwidth):
-          v = int(ldata[i])
+          for y in range(hd.mapheight):
+              for x in range(hd.mapwidth):
+                  v = int(ldata[i])
 
-          if v >= len(blocks):
-            pass#print 'unknown block at',i
-          else:
-            n = int(blocks[v].olay[fg])
-            if n != 0:
-              ti = tileset.tileAt(n)
-              if ti is None:
-                print('invalid tile',n,'at',x,y)
-              else:
-                layer.setCell(x, y, T.Tiled.Cell(ti))
-          i += 1
+                  if v < len(blocks):
+                      n = int(blocks[v].olay[fg])
+                      if n != 0:
+                        ti = tileset.tileAt(n)
+                        if ti is None:
+                          print('invalid tile',n,'at',x,y)
+                        else:
+                          layer.setCell(x, y, T.Tiled.Cell(ti))
+                  i += 1
 
 
 class FMPColormap:
 
   @classmethod
-  def unpack(self, cmap):
-    """cmap -- rgb bytearray"""
-    print('got',len(cmap))
-    for i in range(0,len(cmap),3):
-      r,g,b = struct.unpack('3B', cmap[i:i+3])
-      yield T.qt.QColor(r,g,b).rgb()
+  def unpack(cls, cmap):
+      """cmap -- rgb bytearray"""
+      print('got',len(cmap))
+      for i in range(0,len(cmap),3):
+        r,g,b = struct.unpack('3B', cmap[i:i+3])
+        yield T.qt.QColor(r,g,b).rgb()
 
   @classmethod
-  def pack(self, cmap):
-    """cmap -- T.qt.QImage.colorTable"""
-    yield fmpchunk(id='CMAP', len=len(list(cmap))).pack()
-    for c in cmap:
-      yield struct.pack('3B', (c.qRed,c.qGreen,c.qBlue))
+  def pack(cls, cmap):
+      """cmap -- T.qt.QImage.colorTable"""
+      yield fmpchunk(id='CMAP', len=len(list(cmap))).pack()
+      for c in cmap:
+        yield struct.pack('3B', (c.qRed,c.qGreen,c.qBlue))
 
